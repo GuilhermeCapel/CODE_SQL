@@ -103,45 +103,6 @@ END;
 
 ==================================================================================================================================================================
 
-Validar se o id de operação é valido.
-
-
-DECLARE
-  p1_             VARCHAR2(1) := NULL;
-  var1_           VARCHAR2(1) := NULL;
-  v_operation_id_ VARCHAR2(20) := NULL;
-  b_operation_id_ VARCHAR2(20) := '&NEW:OPERATION_ID';
-
-BEGIN
-  IF (v_operation_id_ is not null) then
-    BEGIN
-      select 'S'
-        INTO var1_
-        from FISCAL_NOTE a
-       where TO_CHAR(a.operation_id) = v_operation_id_ 
-       fetch first row only;
-    EXCEPTION
-      WHEN NO_DATA_FOUND THEN
-        p1_ := 'N';
-    END;
-    IF (var1_ = 'S') THEN
-      BEGIN
-        select 'S'
-          INTO p1_
-          from OPERATION
-         WHERE TO_CHAR(operation_id) = b_operation_id_;
-      END;
-      IF (var1_ = 'S') THEN
-        IF (p1_ = 'N') THEN
-          raise_application_error(-20100,'TST_01_ID : O id de operação ' ||v_operation_id_|| ' é invalido');
-        END IF;
-      END IF;
-    END IF;
-  END IF;
-END;
-
-==================================================================================================================================================================
-
 Evento para gravar no campo Last_change_list_price a data da ultima mudança que foi efetuada na tela 
 
 Ação da Procedure :
