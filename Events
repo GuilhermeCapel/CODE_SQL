@@ -547,3 +547,23 @@ PURCHASE_PART_SUPPLIER_API.NEW__( p0_ , p1_ , p2_ , p3_ , p4_ );
 END;
 
 ==================================================================================================================================================================
+
+-- Não permitir aprovar o projeto se ele estiver no status = 'Planejado'
+
+-- Condições : NEW:ROWSTATE = Started
+
+-- Descrição da ação : Não permitir aprovar o projeto se ele estiver no status = Planejado
+
+
+BEGIN 
+
+IF( '&NEW:ROWSTATE' <> 'Initialized') THEN
+
+RAISE_APPLICATION_ERROR( -20100, '_PROJ_01: Nao é possivel executar a ação de iniciar');
+
+END IF;
+
+END;
+
+==================================================================================================================================================================
+
