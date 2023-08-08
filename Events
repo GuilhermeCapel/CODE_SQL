@@ -1,3 +1,44 @@
+==================================================================================================================================================================
+
+Validar se o id de operação é valido.
+
+
+DECLARE
+  p1_             VARCHAR2(1) := NULL;
+  var1_           VARCHAR2(1) := NULL;
+  v_operation_id_ VARCHAR2(20) := NULL;
+  b_operation_id_ VARCHAR2(20) := '&NEW:OPERATION_ID';
+
+BEGIN
+  IF (v_operation_id_ is not null) then
+    BEGIN
+      select 'S'
+        INTO var1_
+        from FISCAL_NOTE a
+       where TO_CHAR(a.operation_id) = v_operation_id_ 
+       fetch first row only;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        p1_ := 'N';
+    END;
+    IF (var1_ = 'S') THEN
+      BEGIN
+        select 'S'
+          INTO p1_
+          from OPERATION
+         WHERE TO_CHAR(operation_id) = b_operation_id_;
+      END;
+      IF (var1_ = 'S') THEN
+        IF (p1_ = 'N') THEN
+          raise_application_error(-20100,'TST_01_ID : O id de operação ' ||v_operation_id_|| ' é invalido');
+        END IF;
+      END IF;
+    END IF;
+  END IF;
+END;
+
+==================================================================================================================================================================
+
 Evento : Le a uma view e alimenta a página backlog comercial
 
 DECLARE
@@ -35,7 +76,7 @@ BEGIN
   A.VALOR_A_FATURAR,
   A.OBJVERSION,     
   TO_CHAR(SYSDATE, 'YYYY-MM-DD-HH24:MI:SS') AS DATA_ATUALIZACAO 
-  FROM IFSINFO.ERP_F_BACKLOG_CONTRATOS A   
+  FROM ERP_F_BACKLOG_CONTRATOS A   
   )
 
 LOOP
@@ -55,7 +96,7 @@ LOOP
               'CF$_VALOR_CONTRATO'   ||chr(31)||EX.VALOR_CONTRATO   ||chr(30)||
               'CF$_VALOR_FATURADO'   ||chr(31)||EX.VALOR_FATURADO   ||chr(30);
 
-    IFSLAF.LAF_BACK_LOG_CLP.NEW__( p0_ , p1_ , p2_ , p3_ , p4_ );
+  LAF_BACK_LOG_CLP.NEW__( p0_ , p1_ , p2_ , p3_ , p4_ );
      COMMIT;
    END LOOP;
 END;
@@ -76,7 +117,7 @@ BEGIN
     BEGIN
       select 'S'
         INTO var1_
-        from ifslaf.FISCAL_NOTE a
+        from FISCAL_NOTE a
        where TO_CHAR(a.operation_id) = v_operation_id_ 
        fetch first row only;
     EXCEPTION
@@ -87,7 +128,7 @@ BEGIN
       BEGIN
         select 'S'
           INTO p1_
-          from ifslaf.OPERATION
+          from OPERATION
          WHERE TO_CHAR(operation_id) = b_operation_id_;
       END;
       IF (var1_ = 'S') THEN
@@ -151,7 +192,7 @@ BEGIN
   END;
   p3_ := 'CF$_LAST_CHANGE_LIST_PRICE' || (31) || last_change_list_price_ || (30);
 
-  IFSLAF.SALES_PART_BASE_PRICE_API.MODIFY__(p0_, p1_, p2_, p3_, p4_);
+  SALES_PART_BASE_PRICE_API.MODIFY__(p0_, p1_, p2_, p3_, p4_);
 
 END;
 
@@ -180,7 +221,7 @@ BEGIN
        
          select 'S'
          INTO var2_
-         from ifslaf.FISCAL_NOTE_TEMP_CFT A
+         from FISCAL_NOTE_TEMP_CFT A
          WHERE a.CF$_CODIGO_PROCESSO IS NOT NULL
          AND  rowkey = rowkey_
          fetch first row only;
@@ -199,7 +240,7 @@ BEGIN
       
          select 'S'
          INTO var1_
-         from ifslaf.FISCAL_NOTE_TEMP_CFT A
+         from FISCAL_NOTE_TEMP_CFT A
          WHERE a.CF$_LIBERACAO_RECEB_FISICO = '1'
          AND  rowkey = rowkey_
          fetch first row only;
@@ -218,9 +259,8 @@ END;
 
 
 ==================================================================================================================================================================
-
-
 Alterar o status da oportunidade assim que for criada:
+
 AÇAÕ DO EVENTO : 
 
 DECLARE
@@ -265,7 +305,7 @@ BEGIN
   BEGIN
     SELECT A.Objid, A.Objversion
       INTO p1_, p2_
-      FROM IFSLAF.BUSINESS_OPPORTUNITY A 
+      FROM BUSINESS_OPPORTUNITY A 
     -- se vc colocar uma variavel entre aspas ela se torna uma string, é como se vc tivesse mandando o banco pesquisar por opportunity_no_ e não pelo numero
      WHERE A.OPPORTUNITY_NO = opportunity_no_;
   EXCEPTION
@@ -276,7 +316,7 @@ BEGIN
   END;
   -- o comando abaixo escreve nos detalhes da execução em background o passo que esta fazendo
   Transaction_SYS.Set_Status_Info(info_        => 'Iniciando a confirmação da oportunidade',status_type_ => 'INFO');
-  IFSLAF.BUSINESS_OPPORTUNITY_API.Set_Confirmed__(p0_, p1_, p2_, p3_, p4_);
+ BUSINESS_OPPORTUNITY_API.Set_Confirmed__(p0_, p1_, p2_, p3_, p4_);
   COMMIT;
   -- atribui a variavel p0_ na saida pois em alguns casos ela retorna a saida da execução
   Transaction_SYS.Set_Status_Info(info_        => 'Oportunidade confirmada: ' || p0_ || '.',status_type_ => 'INFO');
@@ -348,7 +388,7 @@ declare
 BEGIN
 
 
-     IFSBAM.BUSINESS_OPPORTUNITY_API.Set_In_Progress__(
+     BUSINESS_OPPORTUNITY_API.Set_In_Progress__(
           p0_ ,
  p1_ ,
  p2_ ,
@@ -395,14 +435,115 @@ SELECT
        NVL(FNI.UNITARY_GROSS_PRICE * FNI.ITEM_QUANTITY,0) - NVL(FNI.COFINS_VALUE, 0) - NVL(FNI.PIS_VALUE, 0) - NVL(FNI.DISCOUNT_VALUE, 0) AS VALOR_LIQUIDO
 
  
-  FROM ifsbam.CUSTOMER_ORDER_LINE COL
- JOIN ifsbam.CUSTOMER_ORDER CO ON COL.ORDER_NO = CO.ORDER_NO
- INNER JOIN ifsbam.FISCAL_NOTE_ITEM FNI ON (COL.ORDER_NO = ifsbam.Fn_Cust_Purc_Order_API.Get_Order_No(FISCAL_NOTE_ID, ITEM_NUMBER) AND
-                                             COL.LINE_NO  = ifsbam.Fn_Cust_Purc_Order_API.Get_Line_No(FISCAL_NOTE_ID, ITEM_NUMBER) AND
-                                             COL.REL_NO  = ifsbam.Fn_Cust_Purc_Order_API.Get_Rel_No(FISCAL_NOTE_ID, ITEM_NUMBER))
- INNER JOIN  ifsbam.FISCAL_NOTE FN ON FNI.FISCAL_NOTE_ID = FN.fiscal_note_id                                          
+  FROM CUSTOMER_ORDER_LINE COL
+ JOIN CUSTOMER_ORDER CO ON COL.ORDER_NO = CO.ORDER_NO
+ INNER JOIN FISCAL_NOTE_ITEM FNI ON (COL.ORDER_NO = Fn_Cust_Purc_Order_API.Get_Order_No(FISCAL_NOTE_ID, ITEM_NUMBER) AND
+                                             COL.LINE_NO  = Fn_Cust_Purc_Order_API.Get_Line_No(FISCAL_NOTE_ID, ITEM_NUMBER) AND
+                                             COL.REL_NO  = Fn_Cust_Purc_Order_API.Get_Rel_No(FISCAL_NOTE_ID, ITEM_NUMBER))
+ INNER JOIN FISCAL_NOTE FN ON FNI.FISCAL_NOTE_ID = FN.fiscal_note_id                                          
  WHERE CO.ORDER_ID = 'OL'  AND FN.FISCAL_NOTE_TYPE = 'Ordem de Venda' AND FN.STATE <> 'Cancelado'
   AND (CO.C_AGREEMENT_ID LIKE NVL('&N_CONTRATO', '%'))
   AND (TO_DATE (FN.ENTRY_DATE, 'DD/MM/RRRR') BETWEEN TO_DATE('&DATA_INICIO', 'DD/MM/RRRR') AND TO_DATE('&DATA_FINAL', 'DD/MM/RRRR'))
+
+==================================================================================================================================================================
+-- Evento para tornar o fornecedor que ganhou a cotação como o principal fornecedor do material sempre que uma cotação for aprovada. Tela: Fornecedor do Material de Compra
+
+-- Condições : NEW:ROWSTATE = Converted
+
+-- Atributos personalizados : Inquiry_Line_Part_Order_API.Get_Part_No(&NEW:INQUIRY_NO, &NEW:LINE_NO)
+
+-- Descrição da ação : Marca a FLAG 'Fornecedor Principal - Compra' quando o status da ordem de compra for alterado para convertido.
+
+ 
+DECLARE
+   -- p0 -> __lsResult
+   p0_ VARCHAR2(32000) := NULL;
+
+   -- p1 -> __sObjid
+   p1_ VARCHAR2(32000);
+
+   -- p2 -> __lsObjversion
+   p2_ VARCHAR2(32000);
+
+   -- p3 -> __lsAttr
+   p3_ VARCHAR2(32000) := 'PRIMARY_VENDOR_DB'||chr(31)||'Y'||chr(30);
+
+   -- p4 -> __sAction
+   p4_ VARCHAR2(32000) := 'DO';
+
+BEGIN
+
+BEGIN 
+
+select objversion , objid
+INTO p2_ , p1_
+from ifslaf.PURCHASE_PART_SUPPLIER 
+where vendor_no = '&NEW:VENDOR_NO'
+and PART_NO = '&COD_MAT';
+
+END;
+
+    Log_SYS.Init_Debug_Session_('bp');
+    
+PURCHASE_PART_SUPPLIER_API.MODIFY__( p0_ , p1_ , p2_ , p3_ , p4_ );
+
+
+END;
+
+==================================================================================================================================================================
+
+-- Não é permitido aprovar uma requisição de compra enquanto a Flag notas estiver desmarcado
+-- Condições : 
+-- Descrição da ação : Impedir a liberação da requisição de compra , se a Flag notas estiver desmarcada.
+
+BEGIN 
+
+IF ( '&NEW:NOTE_TEXT' IS NULL ) THEN
+RAISE_APPLICATION_ERROR(-20100,'LAF_SUP_027: Não é permitido aprovar uma requisição enquanto a Flag notas estiver desmarcado.');
+END IF;
+END;
+
+==================================================================================================================================================================
+
+-- Sempre que um fornecedor for cadastrado Dentro do fornecedor, aba Compras, sub aba grupo de compra automaticmamente preenche na tela "Fornecedor Material de compra", todos os materiais de compra daquele grupo de compra e aquele site. 
+
+-- Condições : 
+
+-- Descrição da ação : Sempre que um fornecedor for cadastrado Dentro do fornecedor, aba Compras, sub aba grupo de compra automaticmamente preenche na tela "Fornecedor Material de compra"...
+
+
+DECLARE
+   -- p0 -> __lsResult
+   p0_ VARCHAR2(32000) := NULL;
+
+   -- p1 -> __sObjid
+   p1_ VARCHAR2(32000);
+
+   -- p2 -> __lsObjversion
+   p2_ VARCHAR2(32000);
+
+   -- p3 -> __lsAttr
+   p3_ VARCHAR2(32000) := 'PART_NO'||chr(31)||'EST000001'||chr(30)||'CONTRACT'||chr(31)||'37'||chr(30)||'VENDOR_NO'||chr(31)||'01554285'||chr(30)||'BUY_UNIT_MEAS'||chr(31)||'un'||chr(30)||'CONV_FACTOR'||chr(31)||'1'||chr(30)||'PRICE_UNIT_MEAS'||chr(31)||'un'||chr(30)||'PRICE_CONV_FACTOR'||chr(31)||'1'||chr(30)||'STD_MULTIPLE_QTY'||chr(31)||'1'||chr(30)||'STANDARD_PACK_SIZE'||chr(31)||'1'||chr(30)||'PURCHASE_PAYMENT_TYPE'||chr(31)||'Normal'||chr(30)||'QTY_CALC_ROUNDING'||chr(31)||'16'||chr(30)||'PART_OWNERSHIP'||chr(31)||'Propr da Empresa'||chr(30)||'STATUS_CODE'||chr(31)||'2'||chr(30)||'ACQUISITION_TYPE'||chr(31)||'Somente Compra'||chr(30)||'MINIMUM_QTY'||chr(31)||'0'||chr(30)||'VENDOR_MANUF_LEADTIME'||chr(31)||'0'||chr(30)||'COUNTRY_OF_ORIGIN'||chr(31)||''||chr(30)||'LIST_PRICE'||chr(31)||'2000'||chr(30)||'CURRENCY_CODE'||chr(31)||'BRL'||chr(30)||'LIST_PRICE_INCL_TAX'||chr(31)||'2000'||chr(30)||'RENTAL_LIST_PRICE'||chr(31)||'0'||chr(30)||'RENTAL_LIST_PRICE_INCL_TAX'||chr(31)||'0'||chr(30)||'ADDITIONAL_COST_AMOUNT'||chr(31)||'0'||chr(30)||'ADDITIONAL_COST_INCL_TAX'||chr(31)||'0'||chr(30)||'DISCOUNT'||chr(31)||'0'||chr(30)||'PRIMARY_VENDOR_DB'||chr(31)||'Y'||chr(30)||'RENTAL_PRIMARY_VENDOR_DB'||chr(31)||'N'||chr(30)||'USE_PRICE_INCL_TAX_DB'||chr(31)||'FALSE'||chr(30)||'EXTERNAL_SERVICE_ALLOWED_DB'||chr(31)||'FALSE'||chr(30)||'ORDERS_PRICE_OPTION_DB'||chr(31)||'DONOTSENDPRICE'||chr(30)||'SUPPLY_CONFIGURATION_DB'||chr(31)||'CONFIGATSUPPLIER'||chr(30)||'QUICK_REGISTERED_PART_DB'||chr(31)||'FALSE'||chr(30)||'MULTISITE_PLANNED_PART_DB'||chr(31)||'NOT_MULTISITE_PLAN'||chr(30)||'DIST_ORDER_RECEIPT_TYPE_DB'||chr(31)||'NO AUTOMATIC RECPT'||chr(30)||'RECEIVE_CASE'||chr(31)||'Receber Área Receb'||chr(30)||'SAMPLE_PERCENT'||chr(31)||'0'||chr(30)||'SAMPLE_QTY'||chr(31)||'0'||chr(30)||'INTERNAL_CONTROL_TIME'||chr(31)||'0'||chr(30);
+
+   -- p4 -> __sAction
+   p4_ VARCHAR2(32000) := 'DO';
+
+BEGIN
+
+BEGIN
+
+SELECT objid , objversion  
+INTO p1_ , p2_
+FROM PURCHASE_PART_SUPPLIER
+WHERE VENDOR_NO = '&NEW:SUPPLIER_ID'
+AND &NOME_FORN = '&NEW:NAME';
+ 
+END;
+
+    Log_SYS.Init_Debug_Session_('bp');
+    
+PURCHASE_PART_SUPPLIER_API.NEW__( p0_ , p1_ , p2_ , p3_ , p4_ );
+
+END;
 
 ==================================================================================================================================================================
