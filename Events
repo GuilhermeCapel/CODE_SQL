@@ -1,0 +1,408 @@
+Evento : Le a uma view e alimenta a página backlog comercial
+
+DECLARE
+   -- p0 -> __lsResult
+   p0_ VARCHAR2(32000) :=NULL;
+
+   -- p1 -> __sObjid
+   p1_ VARCHAR2(32000):=NULL;
+
+   -- p2 -> __lsObjversion
+   p2_ VARCHAR2(32000):=NULL;
+
+   -- p3 -> __lsAttr
+   p3_ VARCHAR2(32000):=NULL; 
+   
+   -- p4 -> __sAction
+   p4_ VARCHAR2(32000) := 'DO';
+
+BEGIN   
+  FOR EX IN 
+  (  
+  SELECT 
+  A.DESC_EMPRESA,
+  A.ID_EMPRESA,
+  A.N_CONTRATO,
+  A.MODELO_CONTRATO,
+  TO_CHAR(A.DATA_INICIAL, 'YYYY-MM-DD-HH24:MI:SS') AS DATA_INICIAL,
+  TO_CHAR(A.DATA_INICIAL, 'YYYY-MM-DD-HH24:MI:SS') AS DATA_FINAL,
+  A.ID_CLIENTE,
+  A.DESC_CLIENTE,
+  A.ID_REPRESENTANTE,
+  A.ID_CODE_I_NEGOCIO,
+  A.VALOR_CONTRATO,
+  A.VALOR_FATURADO,
+  A.VALOR_A_FATURAR,
+  A.OBJVERSION,     
+  TO_CHAR(SYSDATE, 'YYYY-MM-DD-HH24:MI:SS') AS DATA_ATUALIZACAO 
+  FROM IFSINFO.ERP_F_BACKLOG_CONTRATOS A   
+  )
+
+LOOP
+      p3_ :=  'CF$_DESC_EMPRESA'     ||chr(31)||EX.DESC_EMPRESA     ||chr(30)||  
+              'CF$_ID_EMPRESA'       ||chr(31)||EX.ID_EMPRESA       ||chr(30)||             
+              'CF$_MODELO_CONTRATO'  ||chr(31)||EX.MODELO_CONTRATO  ||chr(30)||
+              'CF$_AGREEMENT_ID'     ||chr(31)||EX.N_CONTRATO       ||chr(30)||
+              'CF$_DATA_FINAL'       ||chr(31)||EX.DATA_FINAL       ||chr(30)||
+              'CF$_DATA_INICIAL'     ||chr(31)||EX.DATA_INICIAL     ||chr(30)||
+              'CF$_ID_CLIENTE'       ||chr(31)||EX.ID_CLIENTE       ||chr(30)||
+              'CF$_DESC_CLIENTE'     ||chr(31)||EX.DESC_CLIENTE     ||chr(30)||
+              'CF$_ID_CODE_NEGOCIO'  ||chr(31)||EX.ID_CODE_I_NEGOCIO||chr(30)||
+              'CF$_ID_REPRESENTANTE' ||chr(31)||EX.ID_REPRESENTANTE ||chr(30)||
+              'CF$_DATA_ATUALIZACAO' ||chr(31)||EX.DATA_ATUALIZACAO ||chr(30)||
+              'CF$_OBJVERSION'       ||chr(31)||EX.OBJVERSION       ||chr(30)||
+              'CF$_VALOR_A_FATURAR'  ||chr(31)||EX.VALOR_A_FATURAR  ||chr(30)||
+              'CF$_VALOR_CONTRATO'   ||chr(31)||EX.VALOR_CONTRATO   ||chr(30)||
+              'CF$_VALOR_FATURADO'   ||chr(31)||EX.VALOR_FATURADO   ||chr(30);
+
+    IFSLAF.LAF_BACK_LOG_CLP.NEW__( p0_ , p1_ , p2_ , p3_ , p4_ );
+     COMMIT;
+   END LOOP;
+END;
+
+==================================================================================================================================================================
+
+Validar se o id de operação é valido.
+
+
+DECLARE
+  p1_             VARCHAR2(1) := NULL;
+  var1_           VARCHAR2(1) := NULL;
+  v_operation_id_ VARCHAR2(20) := NULL;
+  b_operation_id_ VARCHAR2(20) := '&NEW:OPERATION_ID';
+
+BEGIN
+  IF (v_operation_id_ is not null) then
+    BEGIN
+      select 'S'
+        INTO var1_
+        from ifslaf.FISCAL_NOTE a
+       where TO_CHAR(a.operation_id) = v_operation_id_ 
+       fetch first row only;
+    EXCEPTION
+      WHEN NO_DATA_FOUND THEN
+        p1_ := 'N';
+    END;
+    IF (var1_ = 'S') THEN
+      BEGIN
+        select 'S'
+          INTO p1_
+          from ifslaf.OPERATION
+         WHERE TO_CHAR(operation_id) = b_operation_id_;
+      END;
+      IF (var1_ = 'S') THEN
+        IF (p1_ = 'N') THEN
+          raise_application_error(-20100,'TST_01_ID : O id de operação ' ||v_operation_id_|| ' é invalido');
+        END IF;
+      END IF;
+    END IF;
+  END IF;
+END;
+
+==================================================================================================================================================================
+
+Evento para gravar no campo Last_change_list_price a data da ultima mudança que foi efetuada na tela 
+
+Ação da Procedure :
+
+DECLARE 
+ attr_ VARCHAR2(32000) :=NULL;
+ rowkey_ VARCHAR2(50) := '&NEW:ROWKEY';
+
+BEIGN
+client_sys.add_to_attr('rowkey', rowkey_,attr_):
+transaction_SYS_Deferred_Call('TST_001_TST',attr,'Salvar data Objd');
+END;
+
+
+PROCEDURE:
+
+--create or replace procedure TST_001_TST(attr_ in varchar2) is
+
+DECLARE
+
+  last_change_list_price_ VARCHAR2(32000) := TO_CHAR(SYSDATE,
+                                                     'YYYY-MM-DD HH24:MI:SS');
+  rowkey_                 VARCHAR2(50) := client_sys.Get_Item_Value('rowkey',
+                                                                    attr_);
+
+  -- p0 -> __lsResult
+  p0_ VARCHAR2(32000) := NULL;
+
+  -- p1 -> __sObjid
+  p1_ VARCHAR2(32000) := NULL;
+
+  -- p2 -> __lsObjversion
+  p2_ VARCHAR2(32000) := NULL;
+
+  -- p3 -> __lsAttr
+  p3_ VARCHAR2(32000) := NULL;
+
+  -- p4 -> __sAction
+  p4_ VARCHAR2(32000) := 'DO';
+
+BEGIN
+
+  BEGIN
+    SELECT OBJID, OBJVERSION
+      into p1_, p2_
+      from SALES_PART_BASE_PRICE
+     where objkey = rowkey_;
+  END;
+  p3_ := 'CF$_LAST_CHANGE_LIST_PRICE' || (31) || last_change_list_price_ || (30);
+
+  IFSLAF.SALES_PART_BASE_PRICE_API.MODIFY__(p0_, p1_, p2_, p3_, p4_);
+
+END;
+
+==================================================================================================================================================================
+
+6.8 Alteração na rotina Confirmar
+Será necessário alterar a rotina Confirmar da tela de Recebimento de Nota Fiscal com Ordem de Compra para incluir as validações abaixo:
+1. Verificar se o flag Liberação Receb Físico está marcado e se o campo Código Processo está preenchido.
+Se o flag estiver desmarcado o sistema deverá apresentar uma mensagem de erro, sendo:
+“Não é possível realizar o recebimento físico. existem pendências para esta ação. Por favor, entrar em contato com o departamento de importação.
+
+DESCRIÇÃO : 
+
+Esse evento foi feito na FISCAL_NOTE_TEMP_TAB , portanto para voce comparar as duas tabelas é necessarios um campo em comum entre as duas tabelas (TAB e CFT) , esse ponto é a ROWKEY.
+Basicamente ele pega a rowkey da TAB e da CFT e compara.
+
+
+DECLARE
+  var1_               VARCHAR2(3200) := NULL;
+  var2_               VARCHAR2(3200) := NULL;
+  rowkey_             VARCHAR2(3200) := '&NEW:ROWKEY';
+
+BEGIN
+  
+BEGIN
+       
+         select 'S'
+         INTO var2_
+         from ifslaf.FISCAL_NOTE_TEMP_CFT A
+         WHERE a.CF$_CODIGO_PROCESSO IS NOT NULL
+         AND  rowkey = rowkey_
+         fetch first row only;
+  
+         exception
+         when NO_DATA_FOUND THEN
+         var2_ := 'N';
+  
+         IF var2_ = 'N' THEN
+         raise_application_error(-20100,
+                              'C_TESTE_002:O campo Codigo Processo nao pode ser nulo');
+         END IF;
+    END;
+    
+     BEGIN
+      
+         select 'S'
+         INTO var1_
+         from ifslaf.FISCAL_NOTE_TEMP_CFT A
+         WHERE a.CF$_LIBERACAO_RECEB_FISICO = '1'
+         AND  rowkey = rowkey_
+         fetch first row only;
+  
+         exception
+         when NO_DATA_FOUND THEN
+         var1_ := 'N';
+  
+         IF var1_ = 'N' THEN
+         raise_application_error(-20100,
+                              'C_TESTE_002: Não é possível realizar o recebimento físico. existem pendências para esta ação. Por favor,entrar em contato com o departamento de importação.');
+         END IF;
+    END;
+END;
+
+
+
+==================================================================================================================================================================
+
+
+Alterar o status da oportunidade assim que for criada:
+AÇAÕ DO EVENTO : 
+
+DECLARE
+
+  attr_                      VARCHAR2(3200) := NULL;
+  opportunity_no_   VARCHAR2(3200) := '&NEW:OPPORTUNITY_NO';
+
+BEGIN
+
+  client_sys.Add_To_Attr('opportunity_no', opportunity_no_, attr_);
+  transaction_SYS.Deferred_Call('LAF_COM_074', attr_,'Atualizando a oportunidade: '||opportunity_no_||'.');
+
+END;
+
+
+
+PROCEDURE : 
+
+DECLARE 
+
+CREATE OR REPLACE PROCEDURE LAF_COM_074(attr_ IN VARCHAR2) IS
+
+opportunity_no_ VARCHAR2(32000) := client_sys.Get_Item_Value('opportunity_no',attr_);
+
+-- p0 -> __lsResult
+p0_ VARCHAR2(32000) := NULL;
+
+-- p1 -> __sObjid
+p1_ VARCHAR2(32000) := NULL;
+
+-- p2 -> __lsObjversion
+p2_ VARCHAR2(32000) := NULL;
+
+-- p3 -> __lsAttr
+p3_ VARCHAR2(32000) := NULL;
+
+-- p4 -> __sAction
+p4_ VARCHAR2(32000) := 'DO';
+
+BEGIN
+-- sempre que tiver um select é importante vc iniciar e fechar um novo bloco e nele vc faz a tratativa do erro.
+  BEGIN
+    SELECT A.Objid, A.Objversion
+      INTO p1_, p2_
+      FROM IFSLAF.BUSINESS_OPPORTUNITY A 
+    -- se vc colocar uma variavel entre aspas ela se torna uma string, é como se vc tivesse mandando o banco pesquisar por opportunity_no_ e não pelo numero
+     WHERE A.OPPORTUNITY_NO = opportunity_no_;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      -- como a execução é em background o comando abaixo estora um erro e vc pode ver em background q não rodou por não ter achado
+      RAISE_APPLICATION_ERROR(-20100,'Não foi encontrada nenhuma oportunidade!');
+      dbms_output.put_line('Dados não encontrados');
+  END;
+  -- o comando abaixo escreve nos detalhes da execução em background o passo que esta fazendo
+  Transaction_SYS.Set_Status_Info(info_        => 'Iniciando a confirmação da oportunidade',status_type_ => 'INFO');
+  IFSLAF.BUSINESS_OPPORTUNITY_API.Set_Confirmed__(p0_, p1_, p2_, p3_, p4_);
+  COMMIT;
+  -- atribui a variavel p0_ na saida pois em alguns casos ela retorna a saida da execução
+  Transaction_SYS.Set_Status_Info(info_        => 'Oportunidade confirmada: ' || p0_ || '.',status_type_ => 'INFO');
+END;
+
+==================================================================================================================================================================
+
+Fechar oportunidade sempre que o contrato recorrente estiver com o status Perda / Ganho
+-- Sem Commit
+
+
+DECLARE
+--Fechar oportunidade assim que o contrato mudar par status com ativo 
+  opportunity_no_ VARCHAR2(32000) := '&NEW:OPPORTUNITY_NO';
+
+  -- p0 -> numero oportunidade
+  p0_ VARCHAR2(32000) := NULL;
+
+  -- p1 -> motivo do fechamento
+  p1_ VARCHAR2(32000) := 'WON';
+
+  -- p2 -> motivo de ganho da oportunidade
+  p2_ VARCHAR2(32000) := '13';
+
+  -- p3 -> __lsAttr
+  p3_ VARCHAR2(32000) := NULL;
+
+  -- p4 -> __sAction
+  p4_ VARCHAR2(32000) := 'DO';
+
+BEGIN
+
+  BEGIN
+    SELECT A.Objid, A.Objversion
+      INTO p1_, p2_
+      FROM BUSINESS_OPPORTUNITY A
+     WHERE A.OPPORTUNITY_NO = opportunity_no_;
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      RAISE_APPLICATION_ERROR(-20100,'Não foi encontrado nenhuma oportunidade');
+      dbms_output.put_line('Dados não Encontrados');
+  END;
+  IFSLAF.BUSINESS_OPPORTUNITY_API.Set_Closed__(p0_, p1_, p2_, p3_, p4_);
+END;
+
+==================================================================================================================================================================
+
+Ao criar contrato recorrente mudar o status da oportunidade para " Em progresso"
+
+
+
+declare 
+
+   -- p0 -> numero da oportunidade
+   p0_ VARCHAR2(32000) := '&NEW:OPPORTUNITY_NO';
+
+   -- p1 -> motivo de fechamento
+   p1_ VARCHAR2(32000) := 'WON';
+
+   -- p2 -> motivo de ganho da oportunidade
+   p2_ VARCHAR2(32000) := '13';
+
+   -- p3 -> i_hWndFrame.frmOpportunity.dfsLostTo
+   p3_ VARCHAR2(32000) := '';
+
+   -- p4 -> i_hWndFrame.frmOpportunity.dfsReasonNote
+   p4_ VARCHAR2(32000) := '';
+
+BEGIN
+
+
+     IFSBAM.BUSINESS_OPPORTUNITY_API.Set_In_Progress__(
+          p0_ ,
+ p1_ ,
+ p2_ ,
+ p3_ ,
+ p4_ );
+
+
+END;
+
+==================================================================================================================================================================
+
+Relatorio em SQL : 
+
+SELECT 
+       CO.ORDER_NO               AS N_ORDEM,
+       CO.ORDER_ID               AS TIPO_ORDEM,
+       CO.STATE                  AS STATUS_OV,
+       CO.C_AGREEMENT_ID         AS N_CONTRATO,
+       CO.C_OPPORTUNITY_NO       AS N_OPORTUNIDADE,
+       CO.CONTRACT               AS ID_SITE,
+       CO.company                AS ID_EMPRESA,
+       CO.CUSTOMER_NO            AS ID_CLIENTE,
+       ifsbam.customer_info_api.Get_Name(CO.CUSTOMER_NO) DESC_CLIENTE,             
+       COL.C_SERIAL_NO           AS ID_SERIAL,
+       COL.C_START_BILLING_DATE  AS DATA_INICIO_COBRANCA,
+       COL.C_END_BILLING_DATE    AS DATA_FINAL_COBRANCA,
+       FNI.FISCAL_NOTE_ID        AS ID_NOTA_FISCAL,
+       FN.FISCAL_NOTE_NO         AS N_NOTA_FISCAL,
+       FNI.PART_NO               AS ID_MATERIAL,
+       FNI.PRODUCT_DESCRIPTION   AS DESC_MATERIAL,      
+       FN.CREATION_DATE          AS DATA_CRIACAO,
+       FN.EMISSION_DATE          AS DATA_EMISSAO,
+       FN.ENTRY_DATE             AS DATA_LANCTO,
+       FNI.COFINS_ST_VALUE       AS VALOR_COFINS,
+       FNI.PIS_VALUE             AS VALOR_PIS,
+       FNI.NBM_ID                AS NBM,
+       NVL(FNI.UNITARY_GROSS_PRICE,0) * FNI.ITEM_QUANTITY AS VALOR_BRUTO,
+       NVL(FNI.COFINS_VALUE, 0) AS COFINS_VALUE,
+       NVL(FNI.PIS_VALUE, 0) AS PIS_VALUE,
+       NVL(FNI.COFINS_TO_RETAIN_VALUE, 0) AS COFINS_RETIDO,
+       NVL(FNI.IR_TO_RETAIN_VALUE, 0) AS IRRF_RETIDO,
+       NVL(FNI.PIS_TO_RETAIN_VALUE, 0) AS PIS_RETIDO,
+       NVL(FNI.DISCOUNT_VALUE, 0) AS DISCOUNT_VALUE,
+       NVL(FNI.UNITARY_GROSS_PRICE * FNI.ITEM_QUANTITY,0) - NVL(FNI.COFINS_VALUE, 0) - NVL(FNI.PIS_VALUE, 0) - NVL(FNI.DISCOUNT_VALUE, 0) AS VALOR_LIQUIDO
+
+ 
+  FROM ifsbam.CUSTOMER_ORDER_LINE COL
+ JOIN ifsbam.CUSTOMER_ORDER CO ON COL.ORDER_NO = CO.ORDER_NO
+ INNER JOIN ifsbam.FISCAL_NOTE_ITEM FNI ON (COL.ORDER_NO = ifsbam.Fn_Cust_Purc_Order_API.Get_Order_No(FISCAL_NOTE_ID, ITEM_NUMBER) AND
+                                             COL.LINE_NO  = ifsbam.Fn_Cust_Purc_Order_API.Get_Line_No(FISCAL_NOTE_ID, ITEM_NUMBER) AND
+                                             COL.REL_NO  = ifsbam.Fn_Cust_Purc_Order_API.Get_Rel_No(FISCAL_NOTE_ID, ITEM_NUMBER))
+ INNER JOIN  ifsbam.FISCAL_NOTE FN ON FNI.FISCAL_NOTE_ID = FN.fiscal_note_id                                          
+ WHERE CO.ORDER_ID = 'OL'  AND FN.FISCAL_NOTE_TYPE = 'Ordem de Venda' AND FN.STATE <> 'Cancelado'
+  AND (CO.C_AGREEMENT_ID LIKE NVL('&N_CONTRATO', '%'))
+  AND (TO_DATE (FN.ENTRY_DATE, 'DD/MM/RRRR') BETWEEN TO_DATE('&DATA_INICIO', 'DD/MM/RRRR') AND TO_DATE('&DATA_FINAL', 'DD/MM/RRRR'))
+
+==================================================================================================================================================================
