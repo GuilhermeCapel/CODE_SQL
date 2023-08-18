@@ -528,3 +528,32 @@ END;
 
 ==================================================================================================================================================================
 
+
+Evento para nao deixar criar uma ordem de venda se o campo Analise de Credito não estiver como aprovado.
+
+
+DECLARE
+   var1_                   VARCHAR2(3200) := NULL;   
+   rowkey_                 VARCHAR2(3200) := '&NEW:ROWKEY';
+
+BEGIN
+  BEGIN
+    SELECT 'S'
+    into var1_
+    from c_Rec_Agreement_Item_Cft A
+    WHERE A.CF$_STATUS_CREDIT = '1'
+    AND A.rowkey = rowkey_;
+     EXCEPTION
+         WHEN NO_DATA_FOUND THEN
+            var1_ := 'N';
+            END;
+            
+      IF (var1_ = 'N') THEN
+        raise_application_error(-20100,'LAF_COM_75_02: O credito não esta aprovado , favor verificar o campo Status Credito' );    
+  END IF;
+END;
+
+
+==================================================================================================================================================================
+
+
