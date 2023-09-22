@@ -556,4 +556,48 @@ END;
 
 ==================================================================================================================================================================
 
+- Impede alterar o code part Linservic caso a requisição de compra seja vinculada ao projeto.
 
+DECLARE
+    var1_           VARCHAR2(3200) := NULL;
+    var2_           VARCHAR2(3200) := NULL;
+    pre_accounting_ VARCHAR2(3200) := '&NEW:PRE_ACCOUNTING_ID';
+    project_id_     VARCHAR2(3200) := '&NEW:PROJECT_ID';
+    code_d_         VARCHAR2(3200) := pre_accounting_api.Get_Codeno_D(&NEW:PRE_ACCOUNTING_ID);
+    line_no_        VARCHAR2(3200) := '&NEW:LINE_NO';
+    
+BEGIN
+    IF ( project_id_ is not null) then
+      BEGIN
+        SELECT 'S'
+          INTO var1_
+FROM PROJECT_PRE_ACCOUNTING_EXT PRA
+         WHERE PRA.project_id = project_id_ 
+           AND PRA.code_d = code_d_
+           FETCH FIRST ROW ONLY;
+  exception
+        when no_data_found then
+          var1_ := 'N';
+      END;
+      
+      BEGIN 
+      SELECT 'S'
+      INTO var2_
+      from pre_accounting PA 
+      WHERE PA.pre_accounting_id = pre_accounting_  
+        AND PA.codeno_c = project_id_
+        AND PA.codeno_d = code_d_
+      FETCH FIRST ROW ONLY;
+      exception
+        when no_data_found then
+          var2_ := 'N';
+      END;       
+       
+    IF var1_ <> var2_ THEN
+        raise_application_error(-20100, 'Nº Linha '||line_no_||' : Não é possivel inserir o Code Part LinServiço: '||ifsgft.pre_accounting_api.Get_Codeno_D(pre_accounting_)||' , com a requisição vinculado ao Projeto '||project_id_||'.'||CHR(10)|| 'Favor verificar na tela "Projetos" o Code Part LinServiço correto.(GF4_SUP_005)');
+      END IF;
+     END IF;
+END;
+
+
+==================================================================================================================================================================
